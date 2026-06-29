@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文创品管理平台</title>
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/products.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+
+  <!-- CDN: Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- CDN: Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+
+  <!-- ============ HEADER ============ -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <span class="header-logo">🏮</span>
+        <h1 class="header-title">文创品管理平台</h1>
+      </div>
+      <div class="header-actions">
+        <span class="header-badge" id="header-storage-badge" title="数据存储模式">
+          💾 本地模拟数据
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ TAB BAR ============ -->
+  <nav class="tab-bar" id="tab-bar">
+    <button class="tab-btn active" data-tab="dashboard">
+      <span class="tab-icon">📊</span> 仪表盘
+    </button>
+    <button class="tab-btn" data-tab="self_designed">
+      <span class="tab-icon">🎨</span> 自设计品
+    </button>
+    <button class="tab-btn" data-tab="curated">
+      <span class="tab-icon">✅</span> 严选品
+    </button>
+    <button class="tab-btn" data-tab="general">
+      <span class="tab-icon">🌐</span> 泛选品
+    </button>
+  </nav>
+
+  <!-- ============ MAIN CONTENT ============ -->
+  <main class="main-content">
+
+    <!-- 仪表盘 Tab -->
+    <section class="tab-content active" id="tab-dashboard">
+      <!-- 统计卡片行 -->
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon">📦</div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">总产品数</div>
+          </div>
+        </div>
+        <div class="stat-card stat-self">
+          <div class="stat-icon">🎨</div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-self">0</div>
+            <div class="stat-label">自设计品</div>
+          </div>
+        </div>
+        <div class="stat-card stat-curated">
+          <div class="stat-icon">✅</div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-curated">0</div>
+            <div class="stat-label">严选品</div>
+          </div>
+        </div>
+        <div class="stat-card stat-general">
+          <div class="stat-icon">🌐</div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-general">0</div>
+            <div class="stat-label">泛选品</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 图表行 -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3 class="chart-title">产品层级分布</h3>
+          <div class="chart-container">
+            <canvas id="chart-tier"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">材质分类分布</h3>
+          <div class="chart-container">
+            <canvas id="chart-material"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- 预警 + 最近产品 -->
+      <div class="dashboard-bottom">
+        <div class="alert-card" id="alert-card">
+          <h3 class="card-title">⚠️ 库存预警</h3>
+          <div class="alert-list" id="alert-list">
+            <p class="empty-text">暂无库存预警</p>
+          </div>
+        </div>
+        <div class="recent-card">
+          <h3 class="card-title">🕐 最近添加</h3>
+          <div class="recent-list" id="recent-list">
+            <p class="empty-text">暂无产品</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 自设计品 Tab -->
+    <section class="tab-content" id="tab-self_designed">
+      <div class="toolbar" id="toolbar-self_designed">
+        <div class="toolbar-left">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" placeholder="搜索产品名称、描述、提交人..." data-tier="self_designed">
+          </div>
+          <select class="filter-select" data-filter="material" data-tier="self_designed">
+            <option value="">全部材质</option>
+          </select>
+          <select class="filter-select" data-filter="sort" data-tier="self_designed">
+            <option value="newest">最新添加</option>
+            <option value="oldest">最早添加</option>
+            <option value="name_asc">名称 A-Z</option>
+            <option value="price_asc">价格 低→高</option>
+            <option value="price_desc">价格 高→低</option>
+            <option value="stock_asc">库存 少→多</option>
+          </select>
+        </div>
+        <div class="toolbar-right">
+          <button class="btn btn-outline" id="btn-manage-categories">📂 管理分类</button>
+          <button class="btn btn-primary" id="btn-add-self_designed">＋ 添加产品</button>
+        </div>
+      </div>
+      <div class="product-grid" id="product-grid-self_designed"></div>
+      <div class="pagination" id="pagination-self_designed"></div>
+    </section>
+
+    <!-- 严选品 Tab -->
+    <section class="tab-content" id="tab-curated">
+      <div class="toolbar" id="toolbar-curated">
+        <div class="toolbar-left">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" placeholder="搜索产品名称、描述、提交人..." data-tier="curated">
+          </div>
+          <select class="filter-select" data-filter="material" data-tier="curated">
+            <option value="">全部材质</option>
+          </select>
+          <select class="filter-select" data-filter="status" data-tier="curated">
+            <option value="">全部状态</option>
+            <option value="pending_review">待审核</option>
+            <option value="approved">已通过</option>
+            <option value="rejected">已驳回</option>
+          </select>
+          <select class="filter-select" data-filter="sort" data-tier="curated">
+            <option value="newest">最新添加</option>
+            <option value="oldest">最早添加</option>
+            <option value="name_asc">名称 A-Z</option>
+          </select>
+        </div>
+        <div class="toolbar-right">
+          <button class="btn btn-outline" id="btn-manage-categories-2">📂 管理分类</button>
+          <button class="btn btn-primary" id="btn-add-curated">＋ 添加产品</button>
+        </div>
+      </div>
+      <div class="product-grid" id="product-grid-curated"></div>
+      <div class="pagination" id="pagination-curated"></div>
+    </section>
+
+    <!-- 泛选品 Tab -->
+    <section class="tab-content" id="tab-general">
+      <div class="toolbar" id="toolbar-general">
+        <div class="toolbar-left">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" placeholder="搜索产品名称、描述、提交人..." data-tier="general">
+          </div>
+          <select class="filter-select" data-filter="material" data-tier="general">
+            <option value="">全部材质</option>
+          </select>
+          <select class="filter-select" data-filter="sort" data-tier="general">
+            <option value="newest">最新添加</option>
+            <option value="oldest">最早添加</option>
+            <option value="name_asc">名称 A-Z</option>
+          </select>
+        </div>
+        <div class="toolbar-right">
+          <button class="btn btn-outline" id="btn-manage-categories-3">📂 管理分类</button>
+          <button class="btn btn-primary" id="btn-add-general">＋ 添加产品</button>
+        </div>
+      </div>
+      <div class="product-grid" id="product-grid-general"></div>
+      <div class="pagination" id="pagination-general"></div>
+    </section>
+
+  </main>
+
+  <!-- ============ MODAL OVERLAY ============ -->
+  <div class="modal-overlay" id="modal-overlay" style="display:none;"></div>
+
+  <!-- 产品表单弹窗 -->
+  <div class="modal" id="product-form-modal" style="display:none;">
+    <div class="modal-header">
+      <h2 class="modal-title" id="product-form-title">添加产品</h2>
+      <button class="modal-close" id="btn-close-form">✕</button>
+    </div>
+    <div class="modal-body" id="product-form-body">
+      <!-- 由 product-form.js 动态渲染 -->
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-cancel-form">取消</button>
+      <button class="btn btn-primary" id="btn-submit-form">💾 保存产品</button>
+    </div>
+  </div>
+
+  <!-- 分类管理弹窗 -->
+  <div class="modal" id="category-manager-modal" style="display:none;">
+    <div class="modal-header">
+      <h2 class="modal-title">管理材质分类</h2>
+      <button class="modal-close" id="btn-close-category">✕</button>
+    </div>
+    <div class="modal-body" id="category-manager-body">
+      <!-- 由 category-manager.js 动态渲染 -->
+    </div>
+  </div>
+
+  <!-- 图片灯箱 -->
+  <div class="lightbox-overlay" id="lightbox-overlay" style="display:none;">
+    <button class="lightbox-close" id="lightbox-close">✕</button>
+    <img class="lightbox-image" id="lightbox-image" src="" alt="">
+  </div>
+
+  <!-- Toast 通知容器 -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ============ SCRIPTS ============ -->
+  <!-- 基础模块 -->
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/state.js"></script>
+
+  <!-- UI 组件 -->
+  <script src="js/components/image-upload.js"></script>
+  <script src="js/components/product-card.js"></script>
+  <script src="js/components/product-list.js"></script>
+  <script src="js/components/product-form.js"></script>
+  <script src="js/components/category-manager.js"></script>
+  <script src="js/components/search-filter.js"></script>
+  <script src="js/components/dashboard.js"></script>
+
+  <!-- 路由 & 启动 -->
+  <script src="js/router.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,218 @@
+/* ============================================================
+   文创品管理平台 - 产品卡片 & 网格样式
+   依赖: reset.css, layout.css
+   ============================================================ */
+
+/* --- Product Card --- */
+.product-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+  display: flex;
+  flex-direction: column;
+}
+
+.product-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* 卡片图片区 */
+.product-card-image {
+  position: relative;
+  width: 100%;
+  padding-top: 75%; /* 4:3 ratio */
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.product-card-image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: zoom-in;
+  transition: transform var(--transition-slow);
+}
+
+.product-card:hover .product-card-image img {
+  transform: scale(1.05);
+}
+
+.product-card-image .no-image {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  gap: var(--space-xs);
+}
+
+.product-card-image .no-image-icon {
+  font-size: 36px;
+  opacity: 0.4;
+}
+
+/* 状态角标 */
+.product-card-status {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  z-index: 2;
+}
+
+/* 卡片信息区 */
+.product-card-body {
+  padding: var(--space-md);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.product-card-name {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.4;
+  /* 两行截断 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.product-card-details {
+  margin-top: var(--space-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.product-card-detail-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.product-card-detail-row .detail-label {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.product-card-detail-row .detail-value {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.product-card-price {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-danger);
+  margin-top: auto;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.product-card-price .price-cost {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 400;
+  margin-left: var(--space-xs);
+}
+
+.product-card-footer {
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--color-border-light);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.product-card-footer .btn {
+  flex: 1;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+  padding: 6px 8px;
+}
+
+.product-card-footer .btn-icon-only {
+  flex: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+/* 库存状态色条 */
+.stock-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stock-indicator.normal { background: var(--color-success); }
+.stock-indicator.low { background: var(--color-warning); }
+.stock-indicator.out { background: var(--color-danger); }
+
+/* --- 产品详情展开（用于自设计品的更多信息） --- */
+.product-card-meta {
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.product-card-source {
+  margin-top: var(--space-sm);
+}
+
+.product-card-source a {
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
+  word-break: break-all;
+}
+
+.product-card-source a:hover {
+  text-decoration: underline;
+}
+
+/* --- Promote button --- */
+.product-card .btn-promote {
+  font-size: var(--font-size-xs);
+  padding: 4px 10px;
+  background: var(--color-tier-curated-bg);
+  color: var(--color-tier-curated);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.product-card .btn-promote:hover {
+  background: var(--color-tier-curated);
+  color: #fff;
+}
+
+/* --- 产品网格加载状态 --- */
+.product-grid-loading {
+  grid-column: 1 / -1;
+}
