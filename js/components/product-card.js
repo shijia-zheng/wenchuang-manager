@@ -17,13 +17,24 @@
             size, inventory_quantity, listed_price, cost_price,
             reference_price, source_url, submitter, description } = product;
 
+    // 收集所有图片
+    const allImages = [];
+    if (image_url) allImages.push(image_url);
+    if (product.product_images) {
+      product.product_images.forEach(function (img) {
+        if (img.image_url !== image_url) {
+          allImages.push(img.image_url);
+        }
+      });
+    }
+
     const card = utils.createElement('div', {
       className: 'product-card',
       dataset: { productId: product.id, tier: tier },
     });
 
     // --- 图片区 ---
-    const imageSection = createImageSection(image_url, tier, status);
+    const imageSection = createImageSection(allImages, tier, status);
 
     // --- 信息区 ---
     const body = utils.createElement('div', { className: 'product-card-body' });
@@ -151,25 +162,75 @@
 
   // ============ 辅助函数 ============
 
-  function createImageSection(imageUrl, tier, status) {
+  function createImageSection(images, tier, status) {
     const imageDiv = utils.createElement('div', { className: 'product-card-image' });
 
-    if (imageUrl) {
+    if (images.length === 0) {
+      const noImg = utils.createElement('div', { className: 'no-image' });
+      noImg.innerHTML = '<span class="no-image-icon">🖼️</span><span>暂无图片</span>';
+      imageDiv.appendChild(noImg);
+    } else {
+      let currentIdx = 0;
+
+      // 图片
       const img = utils.createElement('img', {
-        src: imageUrl,
+        src: images[0],
         alt: '',
         loading: 'lazy',
         style: { cursor: 'zoom-in' },
         onClick: function (e) {
           e.stopPropagation();
-          openLightbox(imageUrl);
+          openLightbox(images, currentIdx);
         },
       });
       imageDiv.appendChild(img);
-    } else {
-      const noImg = utils.createElement('div', { className: 'no-image' });
-      noImg.innerHTML = '<span class="no-image-icon">🖼️</span><span>暂无图片</span>';
-      imageDiv.appendChild(noImg);
+
+      // 多图：左右箭头
+      if (images.length > 1) {
+        const prevBtn = utils.createElement('button', {
+          className: 'carousel-arrow carousel-prev',
+          onClick: function (e) {
+            e.stopPropagation();
+            currentIdx = (currentIdx - 1 + images.length) % images.length;
+            img.src = images[currentIdx];
+            updateDots();
+          },
+        }, '‹');
+        const nextBtn = utils.createElement('button', {
+          className: 'carousel-arrow carousel-next',
+          onClick: function (e) {
+            e.stopPropagation();
+            currentIdx = (currentIdx + 1) % images.length;
+            img.src = images[currentIdx];
+            updateDots();
+          },
+        }, '›');
+        imageDiv.appendChild(prevBtn);
+        imageDiv.appendChild(nextBtn);
+
+        // 小圆点
+        const dots = utils.createElement('div', { className: 'carousel-dots' });
+        images.forEach(function (_, i) {
+          const dot = utils.createElement('span', {
+            className: 'carousel-dot' + (i === 0 ? ' active' : ''),
+            onClick: function (e) {
+              e.stopPropagation();
+              currentIdx = i;
+              img.src = images[i];
+              updateDots();
+            },
+          });
+          dots.appendChild(dot);
+        });
+        imageDiv.appendChild(dots);
+
+        function updateDots() {
+          const allDots = dots.querySelectorAll('.carousel-dot');
+          allDots.forEach(function (d, i) {
+            d.classList.toggle('active', i === currentIdx);
+          });
+        }
+      }
     }
 
     // 状态角标
@@ -182,6 +243,9 @@
       }, statusLabel);
       imageDiv.appendChild(badge);
     }
+
+    // 存储图片数据供灯箱使用
+    imageDiv._allImages = images;
 
     return imageDiv;
   }
@@ -237,14 +301,55 @@
 
   // ============ 灯箱 ============
 
-  function openLightbox(imageUrl) {
+  let _lightboxImages = [];
+  let _lightboxIdx = 0;
+
+  function openLightbox(images, startIdx) {
     const overlay = document.querySelector('#lightbox-overlay');
     const img = document.querySelector('#lightbox-image');
     if (!overlay || !img) return;
 
-    img.src = imageUrl;
+    // 支持单图（旧格式）或多图（新格式）
+    if (Array.isArray(images)) {
+      _lightboxImages = images;
+      _lightboxIdx = startIdx || 0;
+    } else {
+      _lightboxImages = [images];
+      _lightboxIdx = 0;
+    }
+
+    updateLightboxImage();
     overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+
+    // 更新导航按钮可见性
+    const prevBtn = document.querySelector('#lightbox-prev');
+    const nextBtn = document.querySelector('#lightbox-next');
+    const counter = document.querySelector('#lightbox-counter');
+    if (prevBtn && nextBtn) {
+      const showNav = _lightboxImages.length > 1;
+      prevBtn.style.display = showNav ? '' : 'none';
+      nextBtn.style.display = showNav ? '' : 'none';
+      if (counter) {
+        counter.style.display = showNav ? '' : 'none';
+        counter.textContent = `${_lightboxIdx + 1} / ${_lightboxImages.length}`;
+      }
+    }
+  }
+
+  function navigateLightbox(direction) {
+    if (_lightboxImages.length <= 1) return;
+    _lightboxIdx = (_lightboxIdx + direction + _lightboxImages.length) % _lightboxImages.length;
+    updateLightboxImage();
+    const counter = document.querySelector('#lightbox-counter');
+    if (counter) {
+      counter.textContent = `${_lightboxIdx + 1} / ${_lightboxImages.length}`;
+    }
+  }
+
+  function updateLightboxImage() {
+    const img = document.querySelector('#lightbox-image');
+    if (img) img.src = _lightboxImages[_lightboxIdx] || '';
   }
 
   function closeLightbox() {
@@ -262,16 +367,25 @@
 
     const overlay = document.querySelector('#lightbox-overlay');
     const closeBtn = document.querySelector('#lightbox-close');
+    const prevBtn = document.querySelector('#lightbox-prev');
+    const nextBtn = document.querySelector('#lightbox-next');
     if (!overlay) return;
 
     // 点击遮罩关闭
     overlay.addEventListener('click', closeLightbox);
     // 关闭按钮
     if (closeBtn) closeBtn.addEventListener('click', closeLightbox);
-    // ESC 键关闭
+    // 前后翻页
+    if (prevBtn) prevBtn.addEventListener('click', function (e) { e.stopPropagation(); navigateLightbox(-1); });
+    if (nextBtn) nextBtn.addEventListener('click', function (e) { e.stopPropagation(); navigateLightbox(1); });
+    // 键盘左右
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && overlay.style.display !== 'none') {
         closeLightbox();
+      } else if (e.key === 'ArrowLeft' && overlay.style.display !== 'none') {
+        navigateLightbox(-1);
+      } else if (e.key === 'ArrowRight' && overlay.style.display !== 'none') {
+        navigateLightbox(1);
       }
     });
   }

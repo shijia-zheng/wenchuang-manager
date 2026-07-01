@@ -1,5 +1,5 @@
 /* ============================================================
-   文创品管理平台 - 图片上传组件
+   文创品管理平台 - 图片上传组件（支持多图）
    依赖: config.js, utils.js
    ============================================================ */
 
@@ -14,128 +14,152 @@
    * 创建图片上传区域
    * @param {object} options
    * @param {string} options.tier - 产品层级
-   * @param {string} [options.currentUrl] - 当前图片 URL（编辑模式）
-   * @param {function} options.onChange - 图片变更回调 (url, file) => void
-   * @returns {HTMLElement} 上传区域 DOM
+   * @param {string[]} [options.existingImages] - 已有图片 URL 列表（编辑模式）
+   * @param {function} options.onChange - 图片变更回调 (urls[]) => void
+   * @returns {HTMLElement} 上传区域容器 DOM
    */
   imageUpload.create = function (options) {
-    const { tier, currentUrl, onChange } = options;
-    let currentImageUrl = currentUrl || '';
+    const { tier, existingImages, onChange } = options;
+    let _imageUrls = existingImages && existingImages.length > 0 ? [...existingImages] : [];
 
-    const zone = utils.createElement('div', {
-      className: 'image-upload-zone' + (currentImageUrl ? ' has-image' : ''),
-    });
+    const container = utils.createElement('div', { className: 'image-upload-container' });
 
-    // 图片预览或占位符
-    const renderContent = function () {
-      zone.innerHTML = '';
-      if (currentImageUrl) {
-        const img = utils.createElement('img', { src: currentImageUrl, alt: '产品图片' });
-        zone.appendChild(img);
+    // --- 缩略图网格 ---
+    const thumbGrid = utils.createElement('div', { className: 'image-thumb-grid' });
+    container.appendChild(thumbGrid);
 
-        // 操作按钮
-        const actions = utils.createElement('div', { className: 'image-upload-actions' });
-        const changeBtn = utils.createElement('button', {
-          className: 'btn btn-sm btn-secondary',
-          onClick: function (e) { e.stopPropagation(); fileInput.click(); },
-        }, '🔄 更换');
-        const removeBtn = utils.createElement('button', {
-          className: 'btn btn-sm',
-          style: { color: 'var(--color-danger)', background: 'var(--color-surface)' },
-          onClick: function (e) {
-            e.stopPropagation();
-            currentImageUrl = '';
-            zone.classList.remove('has-image');
-            renderContent();
-            if (onChange) onChange('', null);
-          },
-        }, '✕ 移除');
-        actions.appendChild(changeBtn);
-        actions.appendChild(removeBtn);
-        zone.appendChild(actions);
-      } else {
-        const placeholder = utils.createElement('div', { className: 'image-upload-placeholder' });
-        placeholder.innerHTML = `
-          <span class="upload-icon">📷</span>
-          <span class="upload-text">点击或拖拽上传产品图片</span>
-          <span class="upload-hint">支持 JPG / PNG / WebP / GIF，最大 10MB</span>
-        `;
-        zone.appendChild(placeholder);
-      }
-    };
+    // --- 添加上传区域 ---
+    const addZone = utils.createElement('div', { className: 'image-upload-add' });
+    addZone.innerHTML = '<span style="font-size:28px;opacity:0.4">＋</span><span style="font-size:12px;color:var(--color-text-muted)">上传图片</span>';
+    container.appendChild(addZone);
 
-    renderContent();
-
-    // 文件选择 input（隐藏）
+    // 隐藏的文件 input
     const fileInput = utils.createElement('input', {
       type: 'file',
       accept: 'image/jpeg,image/png,image/webp,image/gif',
       style: { display: 'none' },
+      multiple: true,
     });
+    container.appendChild(fileInput);
 
-    zone.appendChild(fileInput);
+    // --- 渲染缩略图 ---
+    function renderThumbs() {
+      thumbGrid.innerHTML = '';
+      _imageUrls.forEach(function (url, idx) {
+        const thumb = utils.createElement('div', { className: 'image-thumb-item' });
+        thumb.innerHTML = `<img src="${url}" alt="">`;
 
-    // 点击上传
-    zone.addEventListener('click', function () {
+        const delBtn = utils.createElement('button', {
+          className: 'image-thumb-delete',
+          onClick: function (e) {
+            e.stopPropagation();
+            removeImage(idx);
+          },
+        }, '✕');
+        thumb.appendChild(delBtn);
+
+        // 点击缩略图打开灯箱
+        thumb.addEventListener('click', function (e) {
+          if (e.target === delBtn) return;
+          const overlay = document.querySelector('#lightbox-overlay');
+          const imgEl = document.querySelector('#lightbox-image');
+          if (overlay && imgEl) {
+            imgEl.src = url;
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+          }
+        });
+
+        thumbGrid.appendChild(thumb);
+      });
+    }
+
+    function notifyChange() {
+      if (onChange) onChange(_imageUrls.slice());
+    }
+
+    function removeImage(idx) {
+      _imageUrls.splice(idx, 1);
+      renderThumbs();
+      notifyChange();
+    }
+
+    // --- 上传触发 ---
+    function triggerUpload() {
       fileInput.click();
-    });
+    }
+
+    addZone.addEventListener('click', triggerUpload);
 
     // 拖拽上传
-    zone.addEventListener('dragover', function (e) {
+    addZone.addEventListener('dragover', function (e) {
       e.preventDefault();
-      zone.style.borderColor = 'var(--color-primary)';
+      addZone.style.borderColor = 'var(--color-primary)';
     });
-
-    zone.addEventListener('dragleave', function () {
-      zone.style.borderColor = '';
+    addZone.addEventListener('dragleave', function () {
+      addZone.style.borderColor = '';
     });
-
-    zone.addEventListener('drop', function (e) {
+    addZone.addEventListener('drop', function (e) {
       e.preventDefault();
-      zone.style.borderColor = '';
-      const file = e.dataTransfer.files[0];
-      if (file) processFile(file);
+      addZone.style.borderColor = '';
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) processFiles(files);
     });
 
-    // 文件选择处理
     fileInput.addEventListener('change', function () {
-      const file = fileInput.files[0];
-      if (file) processFile(file);
+      const files = Array.from(fileInput.files);
+      if (files.length > 0) processFiles(files);
+      fileInput.value = '';
     });
 
-    async function processFile(file) {
-      // 验证文件
-      const validation = utils.validateImageFile(file);
-      if (!validation.valid) {
-        utils.showToast(validation.error, 'error');
-        return;
+    async function processFiles(files) {
+      let successCount = 0;
+      const total = files.length;
+
+      for (const file of files) {
+        const validation = utils.validateImageFile(file);
+        if (!validation.valid) {
+          utils.showToast(validation.error, 'error');
+          continue;
+        }
+
+        // 上传中状态：添加一个占位缩略图
+        const placeIdx = _imageUrls.length;
+        _imageUrls.push('__uploading__');
+        renderThumbs();
+        // 高亮占位
+        const items = thumbGrid.querySelectorAll('.image-thumb-item');
+        if (items[placeIdx]) items[placeIdx].style.opacity = '0.5';
+
+        try {
+          const result = await api.uploadImage(file, tier);
+          _imageUrls[placeIdx] = result.publicUrl;
+          successCount++;
+        } catch (err) {
+          _imageUrls.splice(placeIdx, 1);
+          utils.showToast('图片上传失败: ' + err.message, 'error');
+        }
       }
 
-      // 显示加载状态
-      zone.style.opacity = '0.6';
-      zone.style.pointerEvents = 'none';
+      renderThumbs();
+      notifyChange();
 
-      try {
-        const result = await api.uploadImage(file, tier);
-        currentImageUrl = result.publicUrl;
-        zone.classList.add('has-image');
-        renderContent();
-        if (onChange) onChange(result.publicUrl, file);
+      if (successCount > 0 && total > 1) {
+        utils.showToast(`${successCount}/${total} 张图片上传成功`, 'success');
+      } else if (successCount === 1) {
         utils.showToast('图片上传成功', 'success');
-      } catch (err) {
-        utils.showToast('图片上传失败: ' + err.message, 'error');
-      } finally {
-        zone.style.opacity = '';
-        zone.style.pointerEvents = '';
       }
     }
 
-    /** 获取当前图片 URL */
-    zone.getImageUrl = function () {
-      return currentImageUrl;
+    /** 获取当前所有图片 URL 列表 */
+    container.getImages = function () {
+      return _imageUrls.slice();
     };
 
-    return zone;
+    // 初始渲染
+    renderThumbs();
+
+    return container;
   };
 
   // ============ 导出 ============

@@ -13,13 +13,31 @@
 
   let _currentTier = null;
   let _editingProduct = null;
-  let _imageUrl = '';
+  let _imageUrls = [];
+  let _uploadZone = null;
 
   /** 打开表单弹窗 */
-  productForm.open = function (tier, product) {
+  productForm.open = async function (tier, product) {
     _currentTier = tier;
     _editingProduct = product || null;
-    _imageUrl = product ? (product.image_url || '') : '';
+    _imageUrls = [];
+
+    // 编辑模式：加载已有图片
+    if (product) {
+      if (product.image_url) {
+        _imageUrls.push(product.image_url);
+      }
+      try {
+        const existingImages = await api.fetchProductImages(product.id);
+        existingImages.forEach(function (img) {
+          if (img.image_url !== product.image_url) {
+            _imageUrls.push(img.image_url);
+          }
+        });
+      } catch (e) {
+        console.warn('加载已有图片失败:', e.message);
+      }
+    }
 
     const isEdit = !!product;
     const tierLabel = window.WCM.config.TIER_LABELS[tier] || tier;
@@ -48,7 +66,8 @@
     hideModal();
     _currentTier = null;
     _editingProduct = null;
-    _imageUrl = '';
+    _imageUrls = [];
+    _uploadZone = null;
   };
 
   // ============ 内部函数 ============
@@ -92,7 +111,7 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">产品图片</label>
+        <label class="form-label">产品图片（可多张）</label>
         <div id="form-image-upload-zone"></div>
       </div>
 
@@ -210,15 +229,15 @@
     const zoneContainer = document.querySelector('#form-image-upload-zone');
     if (!zoneContainer) return;
 
-    const uploadZone = window.WCM.imageUpload.create({
+    _uploadZone = window.WCM.imageUpload.create({
       tier: tier,
-      currentUrl: product ? product.image_url : '',
-      onChange: function (url) {
-        _imageUrl = url;
+      existingImages: _imageUrls.slice(),
+      onChange: function (urls) {
+        _imageUrls = urls;
       },
     });
 
-    zoneContainer.appendChild(uploadZone);
+    zoneContainer.appendChild(_uploadZone);
   }
 
   function showModal() {
@@ -295,7 +314,7 @@
       tier: tier,
       name: name,
       material_category_id: materialId || null,
-      image_url: _imageUrl || null,
+      image_url: _imageUrls.length > 0 ? _imageUrls[0] : null,
       description: description,
       submitter: submitter,
     };
@@ -361,13 +380,38 @@
     }
 
     try {
+      let savedProduct;
       if (isEdit) {
-        await api.updateProduct(product.id, formData);
-        utils.showToast('产品更新成功', 'success');
+        savedProduct = await api.updateProduct(product.id, formData);
       } else {
-        await api.createProduct(formData);
-        utils.showToast('产品添加成功', 'success');
+        savedProduct = await api.createProduct(formData);
       }
+
+      // 保存多图关联
+      const productId = savedProduct.id || product.id;
+
+      // 删除旧的多图记录（编辑模式）
+      if (isEdit) {
+        try {
+          const oldImages = await api.fetchProductImages(productId);
+          for (const img of oldImages) {
+            await api.deleteProductImage(img.id);
+          }
+        } catch (e) {
+          console.warn('清理旧图片记录失败:', e.message);
+        }
+      }
+
+      // 保存新的多图记录（跳过第一张，已经作为主图 image_url）
+      for (let i = 1; i < _imageUrls.length; i++) {
+        try {
+          await api.addProductImage(productId, _imageUrls[i]);
+        } catch (e) {
+          console.warn('保存附加图片失败:', e.message);
+        }
+      }
+
+      utils.showToast(isEdit ? '产品更新成功' : '产品添加成功', 'success');
 
       productForm.close();
 

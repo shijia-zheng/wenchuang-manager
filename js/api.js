@@ -115,7 +115,8 @@
 
     let query = cfg.supabase.from('products').select(`
       *,
-      material_category:material_category_id (id, name)
+      material_category:material_category_id (id, name),
+      product_images (*)
     `);
 
     if (tier && tier !== 'all') {
@@ -227,6 +228,66 @@
       tier: 'curated',
       status: 'pending_review',
     });
+  };
+
+  // ============ 产品多图片 API ============
+
+  /** 获取某产品的所有图片 */
+  api.fetchProductImages = async function (productId) {
+    if (isMock()) {
+      return window.WCM.mock.productImages
+        ? window.WCM.mock.productImages.filter(img => img.product_id === productId).sort((a, b) => a.sort_order - b.sort_order)
+        : [];
+    }
+    const { data, error } = await cfg.supabase
+      .from('product_images')
+      .select('*')
+      .eq('product_id', productId)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return data;
+  };
+
+  /** 添加产品图片 */
+  api.addProductImage = async function (productId, imageUrl) {
+    if (isMock()) {
+      const img = {
+        id: 'img' + Date.now(),
+        product_id: productId,
+        image_url: imageUrl,
+        sort_order: (window.WCM.mock.productImages || []).filter(i => i.product_id === productId).length,
+        created_at: new Date().toISOString(),
+      };
+      window.WCM.mock.productImages = window.WCM.mock.productImages || [];
+      window.WCM.mock.productImages.push(img);
+      return img;
+    }
+    const { data, error } = await cfg.supabase
+      .from('product_images')
+      .insert({ product_id: productId, image_url: imageUrl, sort_order: 0 })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  };
+
+  /** 删除产品图片 */
+  api.deleteProductImage = async function (imageId) {
+    if (isMock()) {
+      window.WCM.mock.productImages = (window.WCM.mock.productImages || []).filter(i => i.id !== imageId);
+      return true;
+    }
+    const { error } = await cfg.supabase
+      .from('product_images')
+      .delete()
+      .eq('id', imageId);
+    if (error) throw error;
+    return true;
+  };
+
+  /** 设置产品主图 */
+  api.setProductPrimaryImage = async function (productId, imageUrl) {
+    return api.updateProduct(productId, { image_url: imageUrl });
   };
 
   // ============ 仪表盘统计 ============

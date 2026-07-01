@@ -390,6 +390,44 @@
   cursor: default;
 }
 
+.lightbox-nav {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  z-index: 2001;
+  transition: background var(--transition-fast);
+  line-height: 1;
+}
+
+.lightbox-nav:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.lightbox-prev { left: 24px; }
+.lightbox-next { right: 24px; }
+
+.lightbox-counter {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,0.7);
+  font-size: 14px;
+  z-index: 2001;
+  pointer-events: none;
+}
+
 .lightbox-close {
   position: fixed;
   top: 20px;
