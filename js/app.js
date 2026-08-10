@@ -19,32 +19,20 @@
     console.log('[文创品] 正在初始化...');
     updateStorageBadge();
 
-    // 1. 加载材质分类
+    // 1. 加载材质分类（共享数据，需在其他模块之前加载）
     await state.refreshCategories();
 
     // 2. 初始化搜索筛选（会监听分类变化更新下拉）
     searchFilter.init();
 
-    // 3. 加载默认首页产品（自设计品）
-    state.currentTier = 'self_designed';
-    await state.refreshProducts('self_designed');
-
-    // 4. 初始化路由（标签切换）
+    // 3. 初始化路由（根据 URL hash 切换标签、加载数据、渲染界面）
+    //    路由是唯一的数据加载入口，避免重复刷新
     router.init();
 
-    // 5. 渲染仪表盘（当前是首页）
-    await dashboard.render();
-
-    // 6. 渲染产品列表
-    productList.render('self_designed');
-
-    // 7. 更新材质筛选下拉
-    searchFilter.updateMaterialFilter();
-
-    // 8. 绑定全局按钮事件
+    // 4. 绑定全局按钮事件
     bindGlobalEvents();
 
-    // 9. 监听产品数据变化，更新库存状态副标题
+    // 5. 监听产品数据变化，更新仪表盘统计副标题
     state.subscribe('productsChange', function () {
       updateStatSubCounts();
     });
@@ -74,14 +62,8 @@
       });
     });
 
-    // 标签切换时，如果回到仪表盘，刷新图表；如果离开，销毁图表
-    state.subscribe('tierChange', function (tier) {
-      if (tier === 'dashboard') {
-        // 回到仪表盘
-      }
-    });
-
     // 使用 MutationObserver 监听仪表盘标签的显示/隐藏
+    // 仅在仪表盘可见时才渲染图表，隐藏时销毁以释放内存
     const dashboardTab = document.querySelector('#tab-dashboard');
     if (dashboardTab) {
       const observer = new MutationObserver(function (mutations) {
@@ -96,6 +78,11 @@
         });
       });
       observer.observe(dashboardTab, { attributes: true, attributeFilter: ['class'] });
+
+      // 页面初始状态：如果仪表盘是激活的，立即渲染
+      if (dashboardTab.classList.contains('active')) {
+        dashboard.render();
+      }
     }
   }
 
@@ -138,12 +125,19 @@
   }
 
   // ============ 启动 ============
-  document.addEventListener('DOMContentLoaded', function () {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      app.init().catch(function (err) {
+        console.error('[文创品] 启动失败:', err);
+        utils.showToast('应用启动失败，请刷新页面重试', 'error');
+      });
+    });
+  } else {
     app.init().catch(function (err) {
       console.error('[文创品] 启动失败:', err);
       utils.showToast('应用启动失败，请刷新页面重试', 'error');
     });
-  });
+  }
 
   // ============ 导出 ============
   window.WCM = window.WCM || {};

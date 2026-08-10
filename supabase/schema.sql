@@ -36,12 +36,23 @@ CREATE TABLE IF NOT EXISTS products (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 2.1 产品多图表
+CREATE TABLE IF NOT EXISTS product_images (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 3. 索引
 CREATE INDEX IF NOT EXISTS idx_products_tier ON products(tier);
 CREATE INDEX IF NOT EXISTS idx_products_material ON products(material_category_id);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
 CREATE INDEX IF NOT EXISTS idx_products_created ON products(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_products_tier_material ON products(tier, material_category_id);
+CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_images_sort ON product_images(product_id, sort_order);
 
 -- 4. 种子数据 - 材质分类
 INSERT INTO material_categories (name, sort_order) VALUES
@@ -120,8 +131,26 @@ END $$;
 -- 7. RLS 策略
 ALTER TABLE material_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
 
--- 允许认证用户完全访问
+-- 允许匿名用户读取（前端使用 anon key）
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow select for anon on material_categories') THEN
+        CREATE POLICY "Allow select for anon on material_categories" ON material_categories
+            FOR SELECT TO anon USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow select for anon on products') THEN
+        CREATE POLICY "Allow select for anon on products" ON products
+            FOR SELECT TO anon USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow select for anon on product_images') THEN
+        CREATE POLICY "Allow select for anon on product_images" ON product_images
+            FOR SELECT TO anon USING (true);
+    END IF;
+END $$;
+
+-- 允许认证用户完全访问（增删改查）
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for authenticated on material_categories') THEN
@@ -130,6 +159,10 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for authenticated on products') THEN
         CREATE POLICY "Allow all for authenticated on products" ON products
+            FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for authenticated on product_images') THEN
+        CREATE POLICY "Allow all for authenticated on product_images" ON product_images
             FOR ALL TO authenticated USING (true) WITH CHECK (true);
     END IF;
 END $$;

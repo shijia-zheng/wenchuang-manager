@@ -11,6 +11,7 @@
 
   /** 当前激活的标签 */
   let _currentTab = 'dashboard';
+  let _navigating = false;
 
   /** 初始化路由 */
   router.init = function () {
@@ -35,61 +36,63 @@
       }
     });
 
-    // 从 URL hash 加载初始标签
+    // 从 URL hash 加载初始标签（无 hash 时默认仪表盘）
     const initHash = window.location.hash.replace('#', '');
-    if (initHash && ['dashboard', 'self_designed', 'curated', 'general'].includes(initHash)) {
-      router.navigate(initHash, true);
-    }
+    const validTabs = ['dashboard', 'self_designed', 'curated', 'general'];
+    const targetTab = validTabs.includes(initHash) ? initHash : 'dashboard';
+    router.navigate(targetTab, true);
   };
 
   /** 导航到指定标签 */
   router.navigate = async function (tab, fromHash) {
     if (tab === _currentTab && !fromHash) return;
+    if (_navigating) return;
+    _navigating = true;
 
-    _currentTab = tab;
+    try {
+      _currentTab = tab;
 
-    // 更新 URL hash
-    if (!fromHash) {
-      window.location.hash = tab;
-    }
-
-    // 更新标签栏激活状态
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.tab === tab);
-    });
-
-    // 切换内容区
-    document.querySelectorAll('.tab-content').forEach(section => {
-      section.classList.remove('active');
-    });
-
-    const contentEl = document.querySelector(`#tab-${tab}`);
-    if (contentEl) {
-      contentEl.classList.add('active');
-    }
-
-    // 根据标签类型执行操作
-    if (tab === 'dashboard') {
-      // 渲染仪表盘
-      if (window.WCM.dashboard) {
-        window.WCM.dashboard.render();
+      // 更新 URL hash
+      if (!fromHash) {
+        window.location.hash = tab;
       }
-    } else {
-      // 产品标签页
-      state.currentTier = tab;
-      state.filters = { searchTerm: '', materialId: '', sortBy: 'newest', status: '' };
 
-      // 重置搜索框和筛选器
-      resetToolbarFilters(tab);
+      // 更新标签栏激活状态
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
 
-      await state.refreshProducts(tab);
-      if (window.WCM.productList) {
-        window.WCM.productList.render(tab);
+      // 切换内容区
+      document.querySelectorAll('.tab-content').forEach(section => {
+        section.classList.remove('active');
+      });
+
+      const contentEl = document.querySelector(`#tab-${tab}`);
+      if (contentEl) {
+        contentEl.classList.add('active');
       }
-      // 更新材质筛选下拉
-      if (window.WCM.searchFilter) {
-        window.WCM.searchFilter.updateMaterialFilter(tab);
+
+      // 根据标签类型执行操作
+      if (tab !== 'dashboard') {
+        // 产品标签页：加载数据并渲染
+        state.currentTier = tab;
+        state.filters = { searchTerm: '', materialId: '', sortBy: 'newest', status: '' };
+
+        // 重置搜索框和筛选器
+        resetToolbarFilters(tab);
+
+        await state.refreshProducts(tab);
+        if (window.WCM.productList) {
+          window.WCM.productList.render(tab);
+        }
+        // 更新材质筛选下拉
+        if (window.WCM.searchFilter) {
+          window.WCM.searchFilter.updateMaterialFilter(tab);
+        }
       }
+      // 仪表盘由 MutationObserver 自动渲染，无需在此处理
+    } finally {
+      _navigating = false;
     }
   };
 
