@@ -133,44 +133,56 @@ ALTER TABLE material_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_images ENABLE ROW LEVEL SECURITY;
 
--- 允许匿名用户读取（前端使用 anon key）
+-- 匿名用户完全访问（前端使用 anon key 且无登录，内部工具模式）
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow select for anon on material_categories') THEN
-        CREATE POLICY "Allow select for anon on material_categories" ON material_categories
-            FOR SELECT TO anon USING (true);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for anon on material_categories') THEN
+        CREATE POLICY "Allow all for anon on material_categories" ON material_categories
+            FOR ALL TO anon USING (true) WITH CHECK (true);
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow select for anon on products') THEN
-        CREATE POLICY "Allow select for anon on products" ON products
-            FOR SELECT TO anon USING (true);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for anon on products') THEN
+        CREATE POLICY "Allow all for anon on products" ON products
+            FOR ALL TO anon USING (true) WITH CHECK (true);
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow select for anon on product_images') THEN
-        CREATE POLICY "Allow select for anon on product_images" ON product_images
-            FOR SELECT TO anon USING (true);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for anon on product_images') THEN
+        CREATE POLICY "Allow all for anon on product_images" ON product_images
+            FOR ALL TO anon USING (true) WITH CHECK (true);
     END IF;
 END $$;
 
--- 允许认证用户完全访问（增删改查）
+-- 表级授权（新版 Supabase 新建表不会自动授权给 anon，显式授权保证可用）
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.material_categories TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.products TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.product_images TO anon, authenticated;
+
+-- 8. 存储桶（图片上传用）
+-- 公开桶: product-images，匿名可读写（与产品表权限模式一致）
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'product-images',
+    'product-images',
+    TRUE,
+    10485760,  -- 10MB，与前端 config.js IMAGE_UPLOAD.maxSize 一致
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+ON CONFLICT (id) DO NOTHING;
+
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for authenticated on material_categories') THEN
-        CREATE POLICY "Allow all for authenticated on material_categories" ON material_categories
-            FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public read product-images') THEN
+        CREATE POLICY "Public read product-images" ON storage.objects
+            FOR SELECT USING (bucket_id = 'product-images');
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for authenticated on products') THEN
-        CREATE POLICY "Allow all for authenticated on products" ON products
-            FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Anon insert product-images') THEN
+        CREATE POLICY "Anon insert product-images" ON storage.objects
+            FOR INSERT TO anon WITH CHECK (bucket_id = 'product-images');
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all for authenticated on product_images') THEN
-        CREATE POLICY "Allow all for authenticated on product_images" ON product_images
-            FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Anon update product-images') THEN
+        CREATE POLICY "Anon update product-images" ON storage.objects
+            FOR UPDATE TO anon USING (bucket_id = 'product-images');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Anon delete product-images') THEN
+        CREATE POLICY "Anon delete product-images" ON storage.objects
+            FOR DELETE TO anon USING (bucket_id = 'product-images');
     END IF;
 END $$;
-
--- ============================================================
--- 存储桶和策略请在 Supabase Dashboard → Storage 中手动创建:
--- 1. 创建公开桶: product-images
--- 2. 设置 MIME 类型限制: image/jpeg, image/png, image/webp, image/gif
--- 3. 文件大小限制: 5MB
--- 4. 添加策略: SELECT 公开, INSERT 认证用户
--- ============================================================
